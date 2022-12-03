@@ -8,9 +8,7 @@ Because AWS CDK does not support Step Functions Distributed Map yet, we need to 
 
 ## How to use
 
-0. Make sure you have `aws-cdk` installed.
-
-1. Install dependencies
+1. Clone project, install dependencies
 
 ```bash
 git clone https://github.com/dynobase/dynamodb-mass-migration
