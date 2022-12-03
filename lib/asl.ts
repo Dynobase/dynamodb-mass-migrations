@@ -8,7 +8,7 @@ export const asl = (lambdaArn: string, resultsBucket: string) => ({
         {
           Not: {
             Variable: "$.prewarm",
-            IsPresent: true,
+            BooleanEquals: true,
           },
           Next: "Parallel Migration",
         },
@@ -19,7 +19,7 @@ export const asl = (lambdaArn: string, resultsBucket: string) => ({
     },
     "Pre-warm table throughput": {
       Type: "Task",
-      Next: "Wait 1 second",
+      Next: "Wait 10 seconds",
       Parameters: {
         "TableName.$": "$.map[0].tableName",
         BillingMode: "PROVISIONED",
@@ -33,10 +33,32 @@ export const asl = (lambdaArn: string, resultsBucket: string) => ({
       Comment:
         "https://aws.amazon.com/blogs/database/running-spiky-workloads-and-optimizing-costs-by-more-than-90-using-amazon-dynamodb-on-demand-capacity-mode/",
     },
-    "Wait 1 second": {
+    "Wait 10 seconds": {
       Type: "Wait",
-      Seconds: 1,
-      Next: "Switch back to On-Demand capacity mode",
+      Seconds: 10,
+      Next: "Check Table's status",
+      Comment: "Poll for table readiness",
+    },
+    "Check Table's status": {
+      Type: "Task",
+      Next: "Is table's capacity already provisioned?",
+      Parameters: {
+        "TableName.$": "$.map[0].tableName",
+      },
+      Resource: "arn:aws:states:::aws-sdk:dynamodb:describeTable",
+      ResultPath: "$.tableDescription",
+    },
+    "Is table's capacity already provisioned?": {
+      Type: "Choice",
+      Choices: [
+        {
+          Variable: "$.tableDescription.Table.TableStatus",
+          StringEquals: "UPDATING",
+          Next: "Wait 10 seconds",
+          Comment: "Is table ready?",
+        },
+      ],
+      Default: "Switch back to On-Demand capacity mode",
     },
     "Switch back to On-Demand capacity mode": {
       Type: "Task",
