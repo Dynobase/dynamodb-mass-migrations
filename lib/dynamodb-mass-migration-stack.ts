@@ -36,8 +36,10 @@ export class DynamodbMassMigrationStack extends cdk.Stack {
       definition: new Pass(this, "StartState"),
     });
     const cfnStatemachine = stateMachine.node.defaultChild as CfnStateMachine;
+
     resultsBucket.grantReadWrite(stateMachine);
     migrationFunction.grantInvoke(stateMachine);
+    table.grantFullAccess(stateMachine);
     stateMachine.addToRolePolicy(
       new PolicyStatement({
         actions: ["states:StartExecution"],
@@ -49,6 +51,9 @@ export class DynamodbMassMigrationStack extends cdk.Stack {
       asl(migrationFunction.functionArn, resultsBucket.bucketName)
     );
 
+    new CfnOutput(this, "TransformFunctionArn", {
+      value: migrationFunction.functionArn,
+    });
     new CfnOutput(this, "MigrationMachineArn", {
       value: stateMachine.stateMachineArn,
     });

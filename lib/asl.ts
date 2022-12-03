@@ -1,17 +1,62 @@
 export const asl = (lambdaArn: string, resultsBucket: string) => ({
-  Comment: "A description of my state machine",
-  StartAt: "Map",
+  Comment: "Parallel migration state machine",
+  StartAt: "Should pre-warm the table?",
   States: {
-    Map: {
+    "Should pre-warm the table?": {
+      Type: "Choice",
+      Choices: [
+        {
+          Not: {
+            Variable: "$.prewarm",
+            IsPresent: true,
+          },
+          Next: "Parallel Migration",
+        },
+      ],
+      Default: "Pre-warm table throughput",
+      Comment:
+        "On-demand tables can process 2,000 write request units or 6,000 read request units immediately. If more is needed, you can pre-warm your table",
+    },
+    "Pre-warm table throughput": {
+      Type: "Task",
+      Next: "Wait 1 second",
+      Parameters: {
+        "TableName.$": "$.map[0].tableName",
+        BillingMode: "PROVISIONED",
+        ProvisionedThroughput: {
+          "ReadCapacityUnits.$": "$.prewarmRCU",
+          "WriteCapacityUnits.$": "$.prewarmWCU",
+        },
+      },
+      Resource: "arn:aws:states:::aws-sdk:dynamodb:updateTable",
+      ResultPath: null,
+      Comment:
+        "https://aws.amazon.com/blogs/database/running-spiky-workloads-and-optimizing-costs-by-more-than-90-using-amazon-dynamodb-on-demand-capacity-mode/",
+    },
+    "Wait 1 second": {
+      Type: "Wait",
+      Seconds: 1,
+      Next: "Switch back to On-Demand capacity mode",
+    },
+    "Switch back to On-Demand capacity mode": {
+      Type: "Task",
+      Next: "Parallel Migration",
+      Parameters: {
+        "TableName.$": "$.map[0].tableName",
+        BillingMode: "PAY_PER_REQUEST",
+      },
+      Resource: "arn:aws:states:::aws-sdk:dynamodb:updateTable",
+    },
+    "Parallel Migration": {
       Type: "Map",
       ItemProcessor: {
         ProcessorConfig: {
           Mode: "DISTRIBUTED",
           ExecutionType: "EXPRESS",
         },
-        StartAt: "Lambda Invoke",
+        StartAt: "Transform Function",
         States: {
-          "Lambda Invoke": {
+          "Transform Function": {
             Type: "Task",
             Resource: "arn:aws:states:::lambda:invoke",
             OutputPath: "$.Payload",
@@ -37,7 +82,7 @@ export const asl = (lambdaArn: string, resultsBucket: string) => ({
         },
       },
       End: true,
-      Label: "Map",
+      Label: "ParallelMigration",
       ResultWriter: {
         Resource: "arn:aws:states:::s3:putObject",
         Parameters: {
@@ -53,6 +98,7 @@ export const asl = (lambdaArn: string, resultsBucket: string) => ({
           MaxAttempts: 3,
         },
       ],
+      InputPath: "$.map",
     },
   },
 });
