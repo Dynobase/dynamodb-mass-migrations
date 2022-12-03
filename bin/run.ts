@@ -1,10 +1,15 @@
 import { StepFunctions } from "aws-sdk";
 
+interface MapItem {
+  segment: string;
+  totalSegments: number;
+  tableName: string;
+}
 interface Payload {
-  map: any[];
-  prewarm?: boolean;
-  prewarmWCU?: string;
-  prewarmRCU?: string;
+  map: MapItem[];
+  prewarm: boolean;
+  prewarmWCU?: number;
+  prewarmRCU?: number;
 }
 
 const stateMachineArn = process.env.SFN_ARN;
@@ -21,7 +26,7 @@ const region = stateMachineArn.split(":")[3];
 
 const sfn = new StepFunctions({ region });
 
-const map = new Array(totalSegments).fill(1).map((_, i) => ({
+const map: MapItem[] = new Array(totalSegments).fill(1).map((_, i) => ({
   segment: i.toString(),
   totalSegments,
   tableName,
@@ -29,12 +34,13 @@ const map = new Array(totalSegments).fill(1).map((_, i) => ({
 
 const payload: Payload = {
   map,
+  prewarm: false,
 };
 
 if (process.env.PREWARM === "true") {
   payload.prewarm = true;
-  payload.prewarmWCU = process.env.PREWARM_WCU ?? "4000";
-  payload.prewarmRCU = process.env.PREWARM_RCU ?? "12000";
+  payload.prewarmWCU = parseInt(process.env.PREWARM_WCU ?? "4000", 10);
+  payload.prewarmRCU = parseInt(process.env.PREWARM_RCU ?? "12000", 10);
 
   console.log(
     `Pre-warming table with ${payload.prewarmWCU} WCU and ${payload.prewarmRCU} RCU`

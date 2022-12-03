@@ -1,23 +1,41 @@
 export const asl = (lambdaArn: string, resultsBucket: string) => ({
   Comment: "Parallel migration state machine",
-  StartAt: "Should pre-warm the table?",
+  StartAt: "DescribeTable",
   States: {
-    "Should pre-warm the table?": {
+    DescribeTable: {
+      Type: "Task",
+      Next: "Should scale table's throughput?",
+      Parameters: {
+        "TableName.$": "$.map[0].tableName",
+      },
+      Resource: "arn:aws:states:::aws-sdk:dynamodb:describeTable",
+      ResultPath: "$.tableDescription",
+    },
+    "Should scale table's throughput?": {
       Type: "Choice",
       Choices: [
         {
-          Not: {
-            Variable: "$.prewarm",
-            BooleanEquals: true,
-          },
+          Or: [
+            {
+              Not: {
+                Variable: "$.prewarm",
+                BooleanEquals: true,
+              },
+            },
+            {
+              Variable:
+                "$.tableDescription.Table.BillingModeSummary.BillingMode",
+              StringEquals: "PAY_PER_REQUEST",
+            },
+          ],
           Next: "Parallel Migration",
         },
       ],
-      Default: "Pre-warm table throughput",
+      Default: "Update table throughput",
       Comment:
         "On-demand tables can process 2,000 write request units or 6,000 read request units immediately. If more is needed, you can pre-warm your table",
     },
-    "Pre-warm table throughput": {
+    "Update table throughput": {
       Type: "Task",
       Next: "Wait 10 seconds",
       Parameters: {
@@ -58,16 +76,7 @@ export const asl = (lambdaArn: string, resultsBucket: string) => ({
           Comment: "Is table ready?",
         },
       ],
-      Default: "Switch back to On-Demand capacity mode",
-    },
-    "Switch back to On-Demand capacity mode": {
-      Type: "Task",
-      Next: "Parallel Migration",
-      Parameters: {
-        "TableName.$": "$.map[0].tableName",
-        BillingMode: "PAY_PER_REQUEST",
-      },
-      Resource: "arn:aws:states:::aws-sdk:dynamodb:updateTable",
+      Default: "Parallel Migration",
     },
     "Parallel Migration": {
       Type: "Map",

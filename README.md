@@ -43,7 +43,7 @@ This will start the state machine with following payload:
 
 ```json
 {
-  "prewarm": true,
+  "prewarm": false,
   "map": [
     {
       "tableName": "<name-of-the-table-to-migrate>",
@@ -56,13 +56,15 @@ This will start the state machine with following payload:
 
 ### Table pre-warming
 
-> _Important:_ This project assumes that your table is running in On-Demand capacity mode.
+DynamoDB tables with On-demand mode can handle up to 2,000 WCU and 6,000 RCU, or spikes up to 200% of its previous high-water mark.
 
-On-demand capacity tables can handle up to 2,000 and 6,000 RCU by default. If your migration is expected to consume more, this project has a feature to [pre-warm the table before starting the migration](https://aws.amazon.com/blogs/database/running-spiky-workloads-and-optimizing-costs-by-more-than-90-using-amazon-dynamodb-on-demand-capacity-mode/).
+If table is in provisioned mode and your migration is expected to consume more, this project has a feature to [pre-warm the table before starting the migration](https://aws.amazon.com/blogs/database/running-spiky-workloads-and-optimizing-costs-by-more-than-90-using-amazon-dynamodb-on-demand-capacity-mode/).
 
-By providing `PREWARM=true`, it will change your table's capacity to mode to `PROVISIONED` with RCU set to 4,000 (customizable via `PREWARM_WCU` env var) and 12,000 RCU (customizable via `PREWARM_RCU` env var), and then change it back to `ON_DEMAND`. This trick will make your table "warm" and able to handle more load. More on that in the [AWS docs](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadWriteCapacityMode.html#HowItWorks.InitialThroughput).
+By providing `PREWARM=true`, it will set your table's RCU to 4,000 (customizable via `PREWARM_WCU` env var) and RCU to 12,000 (customizable via `PREWARM_RCU` env var).
 
 If you don't need to pre-warm the table, you can pass `PREWARM=false` to the `run.ts` script or simply skip this setting.
+
+**Todo:** add a feature to automatically set the table back to its original capacity after the migration.
 
 ## Useful links:
 
