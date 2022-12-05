@@ -1,4 +1,5 @@
 import { DynamoDB } from "aws-sdk";
+import * as migrations from "./index.migrations";
 
 const ddb = new DynamoDB.DocumentClient();
 
@@ -13,6 +14,8 @@ export const handler = async ({
   totalSegments,
   tableName,
 }: Event): Promise<any> => {
+  console.log(migrations);
+
   if (!tableName) {
     throw new Error("tableName not set");
   }
@@ -45,6 +48,7 @@ export const handler = async ({
     totalItemsProcessed += scanResult.Count ?? 0;
 
     await Promise.all(
+      // todo: replace with transformations from migrations sorted, end with putItem
       (scanResult.Items ?? []).map((i) => transformFn(i, tableName))
     );
   } while (firstRun || nextPageToken);
